@@ -82,11 +82,15 @@ class BayesHMAML(HyperMAML):
             )
 
             # TODO: remove and create separate class for interval linear
-            if i < self.hn_tn_depth - 1:
+            if self.hn_tn_depth > 1:
+                if i < self.hn_tn_depth - 1:
+                    linear = backbone.BLinear_fw(in_dim, out_dim)
+                    linear.bias.data.fill_(0)
+                else:
+                    linear = backbone.IntervalLinear_fw(in_dim, out_dim)
+            else:
                 linear = backbone.BLinear_fw(in_dim, out_dim)
                 linear.bias.data.fill_(0)
-            else:
-                linear = backbone.IntervalLinear_fw(in_dim, out_dim)
 
             layers.append(linear)
 

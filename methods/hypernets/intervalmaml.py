@@ -49,6 +49,10 @@ class IntervalLinear(IntervalModuleWithWeights):
         assert self.max_radius > 0
 
         self.weight = Parameter(torch.empty((out_features, in_features)))
+        if bias:
+            self.bias = Parameter(torch.empty(out_features), requires_grad=True)
+        else:
+            self.bias = None
         self._radius = Parameter(
             torch.empty((out_features, in_features)), requires_grad=True
         )
@@ -60,19 +64,10 @@ class IntervalLinear(IntervalModuleWithWeights):
         # )
 
         # TODO test and fix so that it still works with bias=False
-        if bias:
-            self.bias = Parameter(torch.empty(out_features), requires_grad=True)
-            self._bias_radius = Parameter(
-                torch.empty_like(self.bias), requires_grad=False
-            )
-            self._bias_shift = Parameter(
-                torch.empty_like(self.bias), requires_grad=False
-            )
-            self._bias_scale = Parameter(
-                torch.empty_like(self.bias), requires_grad=False
-            )
-        else:
-            self.bias = None
+        # if bias:
+        #     self.bias = Parameter(torch.empty(out_features), requires_grad=True)
+        # else:
+        #     self.bias = None
         # self.mode: Mode = Mode.VANILLA
         self.reset_parameters()
 
@@ -146,9 +141,6 @@ class IntervalLinear(IntervalModuleWithWeights):
                 nn.init.uniform_(self.bias, -bound, bound)
 
                 self.bias.zero_()
-                self._bias_radius.fill_(self.initial_radius)
-                self._bias_shift.zero_()
-                self._bias_scale.fill_(self.scale_init)
 
     def forward(self, x: Tensor) -> Tensor:  # type: ignore
         x = x.refine_names("N", "bounds", "features")  # type: ignore
@@ -181,9 +173,9 @@ class IntervalLinear(IntervalModuleWithWeights):
         middle = x_middle @ w_middle_pos.t() + x_middle @ w_middle_neg.t()
 
         if self.bias is not None:
-            b_middle = self.bias + self.bias_shift * self.bias_radius
-            b_lower = b_middle - self.bias_scale * self.bias_radius
-            b_upper = b_middle + self.bias_scale * self.bias_radius
+            b_middle = self.bias  # + self.bias_radius
+            b_lower = b_middle  # - self.bias_radius
+            b_upper = b_middle  # + self.bias_radius
             lower = lower + b_lower
             upper = upper + b_upper
             middle = middle + b_middle
@@ -287,7 +279,6 @@ class IntervalMLP(IntervalModel):
         )
 
     def forward(self, x: Tensor) -> Dict[str, Tensor]:  # type: ignore
-        print(x.shape)
         # x = x.refine_names("N", "C", "H", "W")  # type: ignore  # expected input shape
         # x = x.rename(None)  # type: ignore  # drop names for unsupported operations
         x = x.flatten(1)  # (N, features)

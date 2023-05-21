@@ -94,7 +94,6 @@ class BLinear_fw(Linear_fw):  # used in BHMAML to forward input with fast weight
             out = sum(preds) / len(preds)
         else:
             out = super(BLinear_fw, self).forward(x)
-        print(out.shape, "out shape")
         return out
 
 
@@ -105,35 +104,34 @@ class IntervalLinear_fw(IntervalLinear):
             out_features,
             max_radius=0.00000000001,
             initial_radius=0.00000000001,
-            bias=False,
+            bias=True,
             normalize_shift=False,
             normalize_scale=False,
             scale_init=-5,
         )
         self.weight.logvar = None
         self.weight.mu = None
-        # self.bias.logvar = None
-        # self.bias.mu = None
+        self.bias.logvar = None
+        self.bias.mu = None
         self.weight.fast = None
-        # self.bias.fast = None
+        self.bias.fast = None
         self.weight.interval = True
 
     def forward(self, x):
-        print(x.shape, "interval shape before before")
-        x = x.unflatten(1, (1, -1))  # type: ignore  # (N, bounds, features)
-        print(x.shape, "ddd")
-        x = x.tile((1, 3, 1))
-        print(x.shape, "aaa")
-        x = x.refine_names("N", "bounds", "features")  # type: ignore
-        print(x.shape, "ccc")
-        x = super(IntervalLinear_fw, self).forward(F.relu(x))
+        if self.weight.fast is not None and self.bias.fast is not None:
+            preds = []
+            for w, b in zip(self.weight.fast, self.bias.fast):
+                preds.append(F.linear(x, w, b))
 
-        print(x.shape, "interval shape before")
-        x = x[:, 1].squeeze().rename(None)
-        print(x.shape, "interval shape")
-        print(x)
-        print("in_features", self.in_features, "out_features", self.out_features)
-        return x
+            return sum(preds) / len(preds)
+        else:
+            x = x.unflatten(1, (1, -1))  # type: ignore  # (N, bounds, features)
+            x = x.tile((1, 3, 1))
+            x = x.refine_names("N", "bounds", "features")  # type: ignore
+            x = super(IntervalLinear_fw, self).forward(F.relu(x))
+
+            x = x[:, 1].squeeze().rename(None)
+            return x
 
 
 class Conv2d_fw(nn.Conv2d):  # used in MAML to forward input with fast weight
