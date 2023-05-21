@@ -7,10 +7,7 @@ from torch import nn
 
 def get_param_dict(net: nn.Module) -> Dict[str, nn.Parameter]:
     """A dict of named parameters of an nn.Module"""
-    return {
-        n: p
-        for (n, p) in net.named_parameters()
-    }
+    return {n: p for (n, p) in net.named_parameters()}
 
 
 def set_from_param_dict(module: nn.Module, param_dict: Dict[str, torch.Tensor]):
@@ -27,7 +24,7 @@ def set_from_param_dict(module: nn.Module, param_dict: Dict[str, torch.Tensor]):
     However, gradients may still flow through those tensors, so it's useful for the use-case of hypernetworks.
 
     """
-    for (sdk, v) in param_dict.items():
+    for sdk, v in param_dict.items():
         keys = sdk.split(".")
         param_name = keys[-1]
         m = module
@@ -61,6 +58,7 @@ def accuracy_from_scores(scores: torch.Tensor, n_way: int, n_query: int) -> floa
     count_this = len(y_query)
     return correct_this / count_this
 
+
 def kl_diag_gauss_with_standard_gauss(mean, logvar):
     mean_flat = torch.cat([t.view(-1) for t in mean])
     logvar_flat = torch.cat([t.view(-1) for t in logvar])
@@ -68,7 +66,10 @@ def kl_diag_gauss_with_standard_gauss(mean, logvar):
 
     return -0.5 * torch.sum(1 + logvar_flat - mean_flat.pow(2) - var_flat)
 
+
 def reparameterize(mu, logvar):
     std = torch.exp(0.5 * logvar)
     eps = torch.randn_like(std)
+    print(logvar.shape)
+    print(eps.shape, std.shape, mu.shape)
     return eps * std + mu

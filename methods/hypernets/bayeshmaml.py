@@ -81,8 +81,12 @@ class BayesHMAML(HyperMAML):
                 self.n_way if i == (self.hn_tn_depth - 1) else self.hn_tn_hidden_size
             )
 
-            linear = backbone.BLinear_fw(in_dim, out_dim)
-            linear.bias.data.fill_(0)
+            # TODO: remove and create separate class for interval linear
+            if i < self.hn_tn_depth - 1:
+                linear = backbone.BLinear_fw(in_dim, out_dim)
+                linear.bias.data.fill_(0)
+            else:
+                linear = backbone.IntervalLinear_fw(in_dim, out_dim)
 
             layers.append(linear)
 
@@ -263,7 +267,7 @@ class BayesHMAML(HyperMAML):
                     set_loss = self.loss_fn(scores, support_data_labels)
                     reduction = self.kl_scale
                     for weight in self.classifier.parameters():
-                        if weight.logvar is not None:
+                        if hasattr(weight, "logavar") and weight.logvar is not None:
                             if weight.mu is not None:
                                 # set_loss = set_loss + self.kl_w * reduction * self.loss_kld(weight.mu, weight.logvar)
                                 set_loss = set_loss + reduction * self.loss_kld(
