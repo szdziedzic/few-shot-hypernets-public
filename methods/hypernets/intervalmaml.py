@@ -75,7 +75,7 @@ class IntervalLinear(IntervalModuleWithWeights):
         # self._radius clamp
         # gamble softmax
         return (
-            F.softmax(params).clamp(min=RADIUS_MIN, max=self.max_radius + 0.1)
+            F.softmax(params.clamp(min=RADIUS_MIN, max=self.max_radius + 0.1))
             * self.eps
         )
 

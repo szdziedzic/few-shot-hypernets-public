@@ -102,12 +102,13 @@ class IntervalLinear_fw(IntervalLinear):
         super(IntervalLinear_fw, self).__init__(
             in_features,
             out_features,
-            max_radius=0.00000000001,
-            initial_radius=0.00000000001,
+            max_radius=0.5,
+            initial_radius=0.01,
             bias=True,
             normalize_shift=False,
             normalize_scale=False,
             scale_init=-5,
+            initial_eps=0.00001,
         )
         self.weight.logvar = None
         self.weight.mu = None
