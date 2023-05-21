@@ -1,4 +1,5 @@
 import json
+import dill
 import sys
 from collections import defaultdict
 from typing import Type, List, Union, Dict, Optional
