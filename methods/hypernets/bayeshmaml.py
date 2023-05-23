@@ -456,7 +456,7 @@ class BayesHMAML(HyperMAML):
         self.delta_list = []
 
         if epoch % 10 == 0 and epoch != 0:
-            self.classifier[-1].eps = self.classifier[-1].eps + 0.1
+            self.classifier[-1].eps = self.classifier[-1].eps + 0.01
 
         # train
         for i, (x, _) in enumerate(train_loader):
