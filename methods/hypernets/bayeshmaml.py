@@ -455,6 +455,9 @@ class BayesHMAML(HyperMAML):
 
         self.delta_list = []
 
+        if epoch % 10 == 0 and epoch != 0:
+            self.classifier[-1].eps = self.classifier[-1].eps + 0.1
+
         # train
         for i, (x, _) in enumerate(train_loader):
             self.n_query = x.size(1) - self.n_support
@@ -506,6 +509,7 @@ class BayesHMAML(HyperMAML):
 
         metrics = {"accuracy/train": acc_mean}
         metrics["accuracy_wc/train"] = acc_wc_mean
+        metrics["curr_eps"] = self.classifier[-1].eps
 
         loss_ce_all = np.asarray(loss_ce_all)
         loss_ce_mean = np.mean(loss_ce_all)

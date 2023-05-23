@@ -119,7 +119,7 @@ class IntervalLinear_fw(IntervalLinear):
             normalize_shift=False,
             normalize_scale=False,
             scale_init=-5,
-            initial_eps=0.00001,
+            initial_eps=0.1,
         )
         self.weight.logvar = None
         self.weight.mu = None
