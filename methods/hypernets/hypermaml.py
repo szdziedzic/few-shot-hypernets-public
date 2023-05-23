@@ -11,6 +11,7 @@ from torch.nn import functional as F
 import backbone
 from methods.hypernets.utils import get_param_dict, accuracy_from_scores
 from methods.maml import MAML
+from methods.hypernets.intervalmaml import robust_output
 
 
 class HyperNet(nn.Module):
@@ -548,6 +549,7 @@ class HyperMAML(MAML):
         self, test_loader, return_std=False, return_time: bool = False
     ):  # overwrite parrent function
         acc_all = []
+        acc_wc_all = []
         self.delta_list = []
         acc_at = defaultdict(list)
 
@@ -560,11 +562,12 @@ class HyperMAML(MAML):
                 self.n_query = x.size(1) - self.n_support
                 assert self.n_way == x.size(0), "MAML do not support way change"
                 s = time()
-                acc_task, acc_at_metrics = self.set_forward_with_adaptation(x)
+                acc_task, acc_at_metrics, acc_wc = self.set_forward_with_adaptation(x)
                 t = time()
                 for k, v in acc_at_metrics.items():
                     acc_at[k].append(v)
                 acc_all.append(acc_task)
+                acc_wc_all.append(acc_wc)
                 eval_time += t - s
 
         else:
@@ -574,20 +577,28 @@ class HyperMAML(MAML):
                     0
                 ), f"MAML do not support way change, {self.n_way=}, {x.size(0)=}"
                 s = time()
-                correct_this, count_this = self.correct(x)
+                correct_this, correct_this_wc, count_this = self.correct(x)
                 t = time()
                 acc_all.append(correct_this / count_this * 100)
+                acc_wc_all.append(correct_this_wc / count_this * 100)
                 eval_time += t - s
 
         metrics = {k: np.mean(v) if len(v) > 0 else 0 for (k, v) in acc_at.items()}
 
         num_tasks = len(acc_all)
         acc_all = np.asarray(acc_all)
+        acc_wc_all = np.asarray(acc_wc_all)
         acc_mean = np.mean(acc_all)
         acc_std = np.std(acc_all)
+        acc_wc_mean = np.mean(acc_wc_all)
+        acc_wc_std = np.std(acc_wc_all)
         print(
             "%d Test Acc = %4.2f%% +- %4.2f%%"
             % (iter_num, acc_mean, 1.96 * acc_std / np.sqrt(iter_num))
+        )
+        print(
+            "%d Test Acc WC = %4.2f%% +- %4.2f%%"
+            % (iter_num, acc_wc_mean, 1.96 * acc_wc_std / np.sqrt(iter_num))
         )
         print("Num tasks", num_tasks)
 
@@ -596,6 +607,7 @@ class HyperMAML(MAML):
             ret.append(acc_std)
         if return_time:
             ret.append(eval_time)
+        ret.append(acc_wc_mean)
         ret.append(metrics)
 
         return ret
@@ -650,8 +662,16 @@ class HyperMAML(MAML):
     def correct(self, x):
         scores, _ = self.set_forward(x)
         y_query = np.repeat(range(self.n_way), self.n_query)
+        worst_case_scores = robust_output(
+            scores, torch.from_numpy(y_query).long(), self.n_way
+        )
+        best_case_scores = scores[:, 1].squeeze().rename(None)
 
-        topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
+        topk_scores, topk_labels = worst_case_scores.data.topk(1, 1, True, True)
         topk_ind = topk_labels.cpu().numpy()
         top1_correct = np.sum(topk_ind[:, 0] == y_query)
-        return float(top1_correct), len(y_query)
+
+        topk_scores, topk_labels = best_case_scores.data.topk(1, 1, True, True)
+        topk_ind = topk_labels.cpu().numpy()
+        top1_correct_wc = np.sum(topk_ind[:, 0] == y_query)
+        return float(top1_correct), float(top1_correct_wc), len(y_query)

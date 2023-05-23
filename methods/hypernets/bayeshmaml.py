@@ -5,6 +5,7 @@ import torch
 from torch import nn as nn
 from torch.autograd import Variable
 from torch.nn import functional as F
+from methods.hypernets.intervalmaml import robust_output
 
 import backbone
 from methods.hypernets.utils import (
@@ -40,6 +41,7 @@ class BHyperNet(nn.Module):
 
         self.tail_mean = nn.Sequential(*tail_mean)
         self.tail_logvar = nn.Sequential(*tail_logvar)
+        self.n_way = n_way
 
     def forward(self, x):
         out = self.head(x)
@@ -82,7 +84,6 @@ class BayesHMAML(HyperMAML):
             )
 
             # TODO: remove and create separate class for interval linear
-
             if i < self.hn_tn_depth - 1:
                 linear = backbone.BLinear_fw(in_dim, out_dim)
                 linear.bias.data.fill_(0)
@@ -265,7 +266,10 @@ class BayesHMAML(HyperMAML):
 
                 for task_step in range(self.task_update_num):
                     scores = self.classifier(support_embeddings)
-                    set_loss = self.loss_fn(scores, support_data_labels)
+                    worst_case_scores = robust_output(
+                        scores, support_data_labels, self.n_way
+                    )
+                    set_loss = self.loss_fn(worst_case_scores, support_data_labels)
                     reduction = self.kl_scale
                     for weight in self.classifier.parameters():
                         if hasattr(weight, "logavar") and weight.logvar is not None:
@@ -324,6 +328,7 @@ class BayesHMAML(HyperMAML):
         if self.enhance_embeddings:
             with torch.no_grad():
                 logits = self.classifier.forward(support_embeddings).detach()
+                logits = logits[:, 1].squeeze().rename(None)
                 logits = F.softmax(logits, dim=1)
 
             labels = support_data_labels.view(support_embeddings.shape[0], -1)
@@ -365,7 +370,9 @@ class BayesHMAML(HyperMAML):
 
         reduction = self.kl_scale
 
-        loss_ce = self.loss_fn(scores, query_data_labels)
+        worst_case_scores = robust_output(scores, query_data_labels, self.n_way)
+        best_case_scores = scores[:, 1].squeeze().rename(None)
+        loss_ce = self.loss_fn(worst_case_scores, query_data_labels)
 
         loss_kld = torch.zeros_like(loss_ce)
 
@@ -380,13 +387,19 @@ class BayesHMAML(HyperMAML):
         if self.hm_lambda != 0:
             loss = loss + self.hm_lambda * total_delta_sum
 
-        topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
+        topk_scores, topk_labels = worst_case_scores.data.topk(1, 1, True, True)
+        topk_ind = topk_labels.cpu().numpy().flatten()
+        y_labels = query_data_labels.cpu().numpy()
+        top1_correct = np.sum(topk_ind == y_labels)
+        wc_task_accuracy = (top1_correct / len(query_data_labels)) * 100
+
+        topk_scores, topk_labels = best_case_scores.data.topk(1, 1, True, True)
         topk_ind = topk_labels.cpu().numpy().flatten()
         y_labels = query_data_labels.cpu().numpy()
         top1_correct = np.sum(topk_ind == y_labels)
         task_accuracy = (top1_correct / len(query_data_labels)) * 100
 
-        return loss, loss_ce, loss_kld, task_accuracy
+        return loss, loss_ce, loss_kld, task_accuracy, wc_task_accuracy
 
     def set_forward_loss_with_adaptation(self, x):
         """returns loss and accuracy from adapted model (copy)"""
@@ -399,7 +412,9 @@ class BayesHMAML(HyperMAML):
 
         reduction = self.kl_scale
 
-        loss_ce = self.loss_fn(scores, support_data_labels)
+        worst_case_scores = robust_output(scores, support_data_labels, self.n_way)
+        best_case_scores = scores[:, 1].squeeze().rename(None)
+        loss_ce = self.loss_fn(worst_case_scores, support_data_labels)
 
         loss_kld = torch.zeros_like(loss_ce)
 
@@ -412,13 +427,19 @@ class BayesHMAML(HyperMAML):
 
         loss = loss_ce + loss_kld
 
-        topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
+        topk_scores, topk_labels = best_case_scores.data.topk(1, 1, True, True)
         topk_ind = topk_labels.cpu().numpy().flatten()
         y_labels = support_data_labels.cpu().numpy()
         top1_correct = np.sum(topk_ind == y_labels)
         task_accuracy = (top1_correct / len(support_data_labels)) * 100
 
-        return loss, task_accuracy
+        topk_scores, topk_labels = worst_case_scores.data.topk(1, 1, True, True)
+        topk_ind = topk_labels.cpu().numpy().flatten()
+        y_labels = support_data_labels.cpu().numpy()
+        top1_correct = np.sum(topk_ind == y_labels)
+        wc_task_accuracy = (top1_correct / len(support_data_labels)) * 100
+
+        return loss, task_accuracy, wc_task_accuracy
 
     def train_loop(self, epoch, train_loader, optimizer):  # overwrite parrent function
         print_freq = 10
@@ -429,6 +450,7 @@ class BayesHMAML(HyperMAML):
         loss_kld_all = []
         # loss_kld_no_scale_all = []
         acc_all = []
+        acc_wc_all = []
         optimizer.zero_grad()
 
         self.delta_list = []
@@ -438,13 +460,20 @@ class BayesHMAML(HyperMAML):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way == x.size(0), "MAML do not support way change"
 
-            loss, loss_ce, loss_kld, task_accuracy = self.set_forward_loss(x)
+            (
+                loss,
+                loss_ce,
+                loss_kld,
+                task_accuracy,
+                task_wc_accuracy,
+            ) = self.set_forward_loss(x)
             avg_loss = avg_loss + loss.item()  # .data[0]
             loss_all.append(loss)
             loss_ce_all.append(loss_ce.item())
             loss_kld_all.append(loss_kld.item())
             # loss_kld_no_scale_all.append(loss_kld_no_scale.item())
             acc_all.append(task_accuracy)
+            acc_wc_all.append(task_wc_accuracy)
 
             task_count += 1
 
@@ -472,8 +501,11 @@ class BayesHMAML(HyperMAML):
 
         acc_all = np.asarray(acc_all)
         acc_mean = np.mean(acc_all)
+        acc_wc_all = np.asarray(acc_wc_all)
+        acc_wc_mean = np.mean(acc_wc_all)
 
         metrics = {"accuracy/train": acc_mean}
+        metrics["accuracy_wc/train"] = acc_wc_mean
 
         loss_ce_all = np.asarray(loss_ce_all)
         loss_ce_mean = np.mean(loss_ce_all)

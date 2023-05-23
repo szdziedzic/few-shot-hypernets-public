@@ -6,6 +6,17 @@ import math
 import torch.nn.functional as F
 from torch.nn.utils.weight_norm import WeightNorm
 from methods.hypernets.intervalmaml import IntervalLinear
+from typing import cast
+import math
+import os
+from abc import ABC
+from enum import Enum
+from typing import cast, List, Tuple, Dict
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch import Tensor
+from torch.nn.parameter import Parameter
 
 # Basic ResNet model
 
@@ -118,20 +129,68 @@ class IntervalLinear_fw(IntervalLinear):
         self.bias.fast = None
         self.weight.interval = True
 
+    def interval_linear(self, x, weight, bias):
+        x = x.refine_names("N", "bounds", "features")  # type: ignore
+        assert (x.rename(None) >= 0.0).all(), "All input features must be non-negative."  # type: ignore
+
+        x_lower, x_middle, x_upper = map(lambda x_: cast(Tensor, x_.rename(None)), x.unbind("bounds"))  # type: ignore
+        assert (
+            x_lower <= x_middle
+        ).all(), "Lower bound must be less than or equal to middle bound."
+        assert (
+            x_middle <= x_upper
+        ).all(), "Middle bound must be less than or equal to upper bound."
+
+        w_middle: Tensor = weight
+        w_lower = weight - self.radius
+        w_upper = weight + self.radius
+
+        # print(f"DDDD ${self.radius}")
+
+        w_lower_pos = w_lower.clamp(min=0)
+        w_lower_neg = w_lower.clamp(max=0)
+        w_upper_pos = w_upper.clamp(min=0)
+        w_upper_neg = w_upper.clamp(max=0)
+        # Further splits only needed for numeric stability with asserts
+        w_middle_pos = w_middle.clamp(min=0)
+        w_middle_neg = w_middle.clamp(max=0)
+
+        lower = x_lower @ w_lower_pos.t() + x_upper @ w_lower_neg.t()
+        upper = x_upper @ w_upper_pos.t() + x_lower @ w_upper_neg.t()
+        middle = x_middle @ w_middle_pos.t() + x_middle @ w_middle_neg.t()
+
+        if bias is not None:
+            b_middle = bias  # + self.bias_radius
+            b_lower = b_middle  # - self.bias_radius
+            b_upper = b_middle  # + self.bias_radius
+            lower = lower + b_lower
+            upper = upper + b_upper
+            middle = middle + b_middle
+
+        assert (
+            lower <= middle
+        ).all(), "Lower bound must be less than or equal to middle bound."
+        assert (
+            middle <= upper
+        ).all(), "Middle bound must be less than or equal to upper bound."
+
+        return torch.stack([lower, middle, upper], dim=1).refine_names(
+            "N", "bounds", "features"
+        )
+
     def forward(self, x):
+        x = x.unflatten(1, (1, -1))  # type: ignore  # (N, bounds, features)
+        x = x.tile((1, 3, 1))
+        x = x.refine_names("N", "bounds", "features")
         if self.weight.fast is not None and self.bias.fast is not None:
             preds = []
             for w, b in zip(self.weight.fast, self.bias.fast):
-                preds.append(F.linear(x, w, b))
+                preds.append(self.interval_linear(x, w, b))
 
             return sum(preds) / len(preds)
         else:
-            x = x.unflatten(1, (1, -1))  # type: ignore  # (N, bounds, features)
-            x = x.tile((1, 3, 1))
-            x = x.refine_names("N", "bounds", "features")  # type: ignore
             x = super(IntervalLinear_fw, self).forward(F.relu(x))
 
-            x = x[:, 1].squeeze().rename(None)
             return x
 
 

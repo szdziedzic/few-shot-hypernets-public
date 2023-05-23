@@ -292,3 +292,19 @@ class IntervalMLP(IntervalModel):
     @property
     def device(self):
         return self.interval_linear.weight.device
+
+
+def robust_output(last_output, target, num_classes, device=torch.device("cuda")):
+    """Get the robust version of the current output.
+    Returns
+    -------
+    Tensor
+        Robust output logits (lower bound for correct class, upper bounds for incorrect classes).
+    """
+    output_lower, _, output_higher = last_output.unbind("bounds")
+    y_oh = F.one_hot(target, num_classes=num_classes)  # type: ignore
+    y_oh = y_oh.to(device)
+    return torch.where(
+        y_oh.bool(), output_lower.rename(None), output_higher.rename(None)
+    )
+
