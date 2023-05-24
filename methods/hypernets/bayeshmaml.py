@@ -47,7 +47,7 @@ class BHyperNet(nn.Module):
         out = self.head(x)
         out_mean = self.tail_mean(out)
         out_logvar = self.tail_logvar(out)
-        return out_mean, out_logvar
+        return out_mean #, out_logvar
 
 
 class BayesHMAML(HyperMAML):
