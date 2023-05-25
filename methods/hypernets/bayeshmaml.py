@@ -270,19 +270,6 @@ class BayesHMAML(HyperMAML):
                         scores, support_data_labels, self.n_way
                     )
                     set_loss = self.loss_fn(worst_case_scores, support_data_labels)
-                    reduction = self.kl_scale
-                    for weight in self.classifier.parameters():
-                        if hasattr(weight, "logavar") and weight.logvar is not None:
-                            if weight.mu is not None:
-                                # set_loss = set_loss + self.kl_w * reduction * self.loss_kld(weight.mu, weight.logvar)
-                                set_loss = set_loss + reduction * self.loss_kld(
-                                    weight.mu, weight.logvar
-                                )
-                            else:
-                                # set_loss = set_loss + self.kl_w * reduction * self.loss_kld(weight, weight.logvar)
-                                set_loss = set_loss + reduction * self.loss_kld(
-                                    weight, weight.logvar
-                                )
 
                     grad = torch.autograd.grad(
                         set_loss, fast_parameters, create_graph=True, allow_unused=True
@@ -374,15 +361,7 @@ class BayesHMAML(HyperMAML):
         best_case_scores = scores[:, 1].squeeze().rename(None)
         loss_ce = self.loss_fn(worst_case_scores, query_data_labels)
 
-        loss_kld = torch.zeros_like(loss_ce)
-
-        for name, weight in self.classifier.named_parameters():
-            if weight.mu is not None and weight.logvar is not None:
-                val = self.loss_kld(weight.mu, weight.logvar)
-                # loss_kld = loss_kld + self.kl_w * reduction * val
-                loss_kld = loss_kld + reduction * val
-
-        loss = loss_ce + loss_kld
+        loss = loss_ce
 
         if self.hm_lambda != 0:
             loss = loss + self.hm_lambda * total_delta_sum
@@ -399,7 +378,7 @@ class BayesHMAML(HyperMAML):
         top1_correct = np.sum(topk_ind == y_labels)
         task_accuracy = (top1_correct / len(query_data_labels)) * 100
 
-        return loss, loss_ce, loss_kld, task_accuracy, wc_task_accuracy
+        return loss, loss_ce, torch.tensor(-1), task_accuracy, wc_task_accuracy
 
     def set_forward_loss_with_adaptation(self, x):
         """returns loss and accuracy from adapted model (copy)"""
@@ -416,16 +395,7 @@ class BayesHMAML(HyperMAML):
         best_case_scores = scores[:, 1].squeeze().rename(None)
         loss_ce = self.loss_fn(worst_case_scores, support_data_labels)
 
-        loss_kld = torch.zeros_like(loss_ce)
-
-        for name, weight in self.classifier.named_parameters():
-            if weight.mu is not None and weight.logvar is not None:
-                # loss_kld = loss_kld + self.kl_w * reduction * self.loss_kld(weight.mu, weight.logvar)
-                loss_kld = loss_kld + reduction * self.loss_kld(
-                    weight.mu, weight.logvar
-                )
-
-        loss = loss_ce + loss_kld
+        loss = loss_ce
 
         topk_scores, topk_labels = best_case_scores.data.topk(1, 1, True, True)
         topk_ind = topk_labels.cpu().numpy().flatten()
