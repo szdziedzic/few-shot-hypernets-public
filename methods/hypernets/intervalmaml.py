@@ -53,9 +53,7 @@ class IntervalLinear(IntervalModuleWithWeights):
             self.bias = Parameter(torch.empty(out_features), requires_grad=True)
         else:
             self.bias = None
-        self._radius = Parameter(
-            torch.empty((out_features, in_features)), requires_grad=True
-        )
+        self._radius = torch.empty((out_features, in_features)).cuda()
         # self._shift = Parameter(
         #     torch.empty((out_features, in_features)), requires_grad=False
         # )
@@ -74,10 +72,7 @@ class IntervalLinear(IntervalModuleWithWeights):
     def radius_transform(self, params: Tensor):
         # self._radius clamp
         # gamble softmax
-        return (
-            F.softmax(params)
-            * self.eps
-        )
+        return F.softmax(params) * self.eps
 
     @property
     def radius(self) -> Tensor:
@@ -132,7 +127,7 @@ class IntervalLinear(IntervalModuleWithWeights):
     def reset_parameters(self) -> None:
         with torch.no_grad():
             nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))  # type: ignore
-            self._radius.fill_(torch.tensor(self.initial_radius, dtype=torch.double))
+            self._radius.zero_()
             # self._shift.zero_()
             # self._scale.fill_(self.scale_init)
             if self.bias is not None:
@@ -307,4 +302,3 @@ def robust_output(last_output, target, num_classes, device=torch.device("cuda"))
     return torch.where(
         y_oh.bool(), output_lower.rename(None), output_higher.rename(None)
     )
-

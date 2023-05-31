@@ -128,6 +128,8 @@ class IntervalLinear_fw(IntervalLinear):
         self.weight.fast = None
         self.bias.fast = None
         self.weight.interval = True
+        self.in_features = in_features
+        self.out_features = out_features
 
     def interval_linear(self, x, weight, bias):
         x = x.refine_names("N", "bounds", "features")  # type: ignore
@@ -185,10 +187,13 @@ class IntervalLinear_fw(IntervalLinear):
         if self.weight.fast is not None and self.bias.fast is not None:
             preds = []
             for w, b in zip(self.weight.fast, self.bias.fast):
+                self._radius = self.weight.logvar
                 preds.append(self.interval_linear(x, w, b))
 
             return sum(preds) / len(preds)
         else:
+            self._radius = torch.empty((self.out_features, self.in_features)).cuda()
+            self._radius.zero_()
             x = super(IntervalLinear_fw, self).forward(F.relu(x))
 
             return x
