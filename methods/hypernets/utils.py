@@ -3,6 +3,7 @@ from typing import Dict
 import numpy as np
 import torch
 from torch import nn
+from methods.hypernets.intervalmaml import robust_output
 
 
 def get_param_dict(net: nn.Module) -> Dict[str, nn.Parameter]:
@@ -48,15 +49,28 @@ class SinActivation(nn.Module):
 
 def accuracy_from_scores(scores: torch.Tensor, n_way: int, n_query: int) -> float:
     """Assumes that scores are for examples sorted by class!"""
-    s_nq, s_nw = scores.shape
+    best_case_scores = scores[:, 1].squeeze().rename(None)
+    s_nq, s_nw = best_case_scores.shape
     assert (s_nq, s_nw) == (n_way * n_query, n_way), ((s_nq, s_nw), (n_query, n_way))
     y_query = np.repeat(range(n_way), n_query)
-    topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
+    worst_case_scores = robust_output(
+        scores, torch.from_numpy(y_query).long(), n_way
+    )
+    topk_scores, topk_labels = best_case_scores.data.topk(1, 1, True, True)
     topk_ind = topk_labels.cpu().numpy()
     top1_correct = np.sum(topk_ind[:, 0] == y_query)
     correct_this = float(top1_correct)
     count_this = len(y_query)
-    return correct_this / count_this
+    acc_best_case = correct_this / count_this
+
+    topk_scores, topk_labels = worst_case_scores.data.topk(1, 1, True, True)
+    topk_ind = topk_labels.cpu().numpy()
+    top1_correct = np.sum(topk_ind[:, 0] == y_query)
+    correct_this = float(top1_correct)
+    count_this = len(y_query)
+    acc_worst_case = correct_this / count_this
+
+    return acc_best_case, acc_worst_case
 
 
 def kl_diag_gauss_with_standard_gauss(mean, logvar):

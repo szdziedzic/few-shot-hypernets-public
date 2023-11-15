@@ -623,7 +623,7 @@ class HyperMAML(MAML):
                 else:
                     param2.fast = None
 
-        metrics = {"accuracy/val@-0": self_copy.query_accuracy(x)}
+        metrics = {"accuracy/val@-0": self_copy.query_accuracy(x)[0], "accuracy/val@-0_wc": self_copy.query_accuracy(x)[1]}
 
         val_opt_type = (
             torch.optim.Adam if self.hn_val_optim == "adam" else torch.optim.SGD
@@ -640,7 +640,8 @@ class HyperMAML(MAML):
                 self_copy.eval()
                 metrics[f"accuracy/val_support_acc@-{i}"] = val_support_acc
                 metrics[f"accuracy/val_loss@-{i}"] = loss.item()
-                metrics[f"accuracy/val@-{i}"] = self_copy.query_accuracy(x)
+                metrics[f"accuracy/val@-{i}"] = self_copy.query_accuracy(x)[0]
+                metrics[f"accuracy/val@-{i}_wc"] = self_copy.query_accuracy(x)[1]
 
         # free CUDA memory by deleting "fast" parameters
         for param in self_copy.parameters():
@@ -652,7 +653,9 @@ class HyperMAML(MAML):
         scores, _ = self.set_forward(x, train_stage=True)
         return 100 * accuracy_from_scores(
             scores, n_way=self.n_way, n_query=self.n_query
-        )
+        )[0], 100 * accuracy_from_scores(
+            scores, n_way=self.n_way, n_query=self.n_query
+        )[1]
 
     def get_logits(self, x):
         self.n_query = x.size(1) - self.n_support

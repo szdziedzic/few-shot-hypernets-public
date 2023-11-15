@@ -535,7 +535,7 @@ class BayesHMAML(HyperMAML):
                 else:
                     param2.logvar = None
 
-        metrics = {"accuracy/val@-0": self_copy.query_accuracy(x)}
+        metrics = {"accuracy/val@-0": self_copy.query_accuracy(x)[0], "accuracy/val@-0_wc": self_copy.query_accuracy(x)[1]}
 
         val_opt_type = (
             torch.optim.Adam if self.hn_val_optim == "adam" else torch.optim.SGD
@@ -552,7 +552,8 @@ class BayesHMAML(HyperMAML):
                 self_copy.eval()
                 metrics[f"accuracy/val_support_acc@-{i}"] = val_support_acc
                 metrics[f"accuracy/val_loss@-{i}"] = loss.item()
-                metrics[f"accuracy/val@-{i}"] = self_copy.query_accuracy(x)
+                metrics[f"accuracy/val@-{i}"] = self_copy.query_accuracy(x)[0]
+                metrics[f"accuracy/val@-{i}_wc"] = self_copy.query_accuracy(x)[1]
 
         # free CUDA memory by deleting "fast" parameters
         for param in self_copy.parameters():
@@ -560,4 +561,4 @@ class BayesHMAML(HyperMAML):
             param.mu = None
             param.logvar = None
 
-        return metrics[f"accuracy/val@-{self.hn_val_epochs}"], metrics
+        return metrics[f"accuracy/val@-{self.hn_val_epochs}"], metrics, metrics[f"accuracy/val@-{self.hn_val_epochs}_wc"]
