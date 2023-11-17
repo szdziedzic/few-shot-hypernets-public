@@ -546,11 +546,12 @@ class BayesHMAML(HyperMAML):
             for i in range(1, self.hn_val_epochs + 1):
                 self_copy.train()
                 val_opt.zero_grad()
-                loss, val_support_acc = self_copy.set_forward_loss_with_adaptation(x)
+                loss, val_support_acc, val_support_acc_wc = self_copy.set_forward_loss_with_adaptation(x)
                 loss.backward()
                 val_opt.step()
                 self_copy.eval()
                 metrics[f"accuracy/val_support_acc@-{i}"] = val_support_acc
+                metrics[f"accuracy/val_support_acc@-{i}_wc"] = val_support_acc_wc
                 metrics[f"accuracy/val_loss@-{i}"] = loss.item()
                 metrics[f"accuracy/val@-{i}"] = self_copy.query_accuracy(x)[0]
                 metrics[f"accuracy/val@-{i}_wc"] = self_copy.query_accuracy(x)[1]
