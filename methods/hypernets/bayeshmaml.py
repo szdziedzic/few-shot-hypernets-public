@@ -201,7 +201,7 @@ class BayesHMAML(HyperMAML):
             weight.fast.append(weight.mu)
         else:
             weight.logvar = logvar
-
+            self.classifier._radius = logvar.clone()
             weight.fast = []
             if train_stage:
                 for _ in range(
@@ -535,7 +535,10 @@ class BayesHMAML(HyperMAML):
                 else:
                     param2.logvar = None
 
-        metrics = {"accuracy/val@-0": self_copy.query_accuracy(x)[0], "accuracy/val@-0_wc": self_copy.query_accuracy(x)[1]}
+        metrics = {
+            "accuracy/val@-0": self_copy.query_accuracy(x)[0],
+            "accuracy/val@-0_wc": self_copy.query_accuracy(x)[1],
+        }
 
         val_opt_type = (
             torch.optim.Adam if self.hn_val_optim == "adam" else torch.optim.SGD
@@ -546,7 +549,11 @@ class BayesHMAML(HyperMAML):
             for i in range(1, self.hn_val_epochs + 1):
                 self_copy.train()
                 val_opt.zero_grad()
-                loss, val_support_acc, val_support_acc_wc = self_copy.set_forward_loss_with_adaptation(x)
+                (
+                    loss,
+                    val_support_acc,
+                    val_support_acc_wc,
+                ) = self_copy.set_forward_loss_with_adaptation(x)
                 loss.backward()
                 val_opt.step()
                 self_copy.eval()
@@ -562,4 +569,8 @@ class BayesHMAML(HyperMAML):
             param.mu = None
             param.logvar = None
 
-        return metrics[f"accuracy/val@-{self.hn_val_epochs}"], metrics, metrics[f"accuracy/val@-{self.hn_val_epochs}_wc"]
+        return (
+            metrics[f"accuracy/val@-{self.hn_val_epochs}"],
+            metrics,
+            metrics[f"accuracy/val@-{self.hn_val_epochs}_wc"],
+        )

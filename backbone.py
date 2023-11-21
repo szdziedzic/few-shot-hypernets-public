@@ -187,7 +187,6 @@ class IntervalLinear_fw(IntervalLinear):
         if self.weight.fast is not None and self.bias.fast is not None:
             preds = []
             for w, b in zip(self.weight.fast, self.bias.fast):
-                self._radius = self.weight.logvar
                 preds.append(self.interval_linear(x, w, b))
 
             return sum(preds) / len(preds)
