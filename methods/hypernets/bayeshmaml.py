@@ -75,6 +75,7 @@ class BayesHMAML(HyperMAML):
         assert (
             self.hn_tn_hidden_size % self.n_way == 0
         ), f"hn_tn_hidden_size {self.hn_tn_hidden_size} should be the multiple of n_way {self.n_way}"
+        layers = []
 
         for i in range(self.hn_tn_depth):
             in_dim = self.feat_dim if i == 0 else self.hn_tn_hidden_size
@@ -82,7 +83,16 @@ class BayesHMAML(HyperMAML):
                 self.n_way if i == (self.hn_tn_depth - 1) else self.hn_tn_hidden_size
             )
 
-            self.classifier = backbone.IntervalLinear_fw(in_dim, out_dim)
+            # TODO: remove and create separate class for interval linear
+            if i < self.hn_tn_depth - 1:
+                linear = backbone.BLinear_fw(in_dim, out_dim)
+                linear.bias.data.fill_(0)
+            else:
+                linear = backbone.IntervalLinear_fw(in_dim, out_dim)
+
+            layers.append(linear)
+
+        self.classifier = nn.Sequential(*layers)
 
     def _init_hypernet_modules(self, params):
         target_net_param_dict = get_param_dict(self.classifier)
