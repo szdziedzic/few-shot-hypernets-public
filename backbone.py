@@ -184,7 +184,11 @@ class IntervalLinear_fw(IntervalLinear):
         x = x.unflatten(1, (1, -1))  # type: ignore  # (N, bounds, features)
         x = x.tile((1, 3, 1))
         x = x.refine_names("N", "bounds", "features")
+        print("Radius:", self._radius)
+        print("Logvar:", self._logvar)
         if self.weight.fast is not None and self.bias.fast is not None:
+            print("weight fast shape:", self.weight.shape)
+            print("bias fast shape:", self.bias.shape)
             preds = []
             for w, b in zip(self.weight.fast, self.bias.fast):
                 preds.append(self.interval_linear(x, w, b))
