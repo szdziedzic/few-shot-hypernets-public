@@ -185,7 +185,7 @@ class IntervalLinear_fw(IntervalLinear):
         x = x.tile((1, 3, 1))
         x = x.refine_names("N", "bounds", "features")
         print("Radius:", self._radius)
-        print("Logvar:", self._logvar)
+        print("Logvar:", self.logvar)
         if self.weight.fast is not None and self.bias.fast is not None:
             print("weight fast shape:", self.weight.shape)
             print("bias fast shape:", self.bias.shape)
