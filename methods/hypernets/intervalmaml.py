@@ -72,15 +72,11 @@ class IntervalLinear(IntervalModuleWithWeights):
     def radius_transform(self, params: Tensor):
         # self._radius clamp
         # gamble softmax
-        return F.softmax(params) * self.eps
+        return params
 
     @property
     def radius(self) -> Tensor:
         return self.radius_transform(self._radius)
-
-    @radius.setter
-    def radius(self, new_radius):
-        self._radius = Parameter(new_radius, requires_grad=True)
 
     @property
     def bias_radius(self) -> Tensor:
