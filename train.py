@@ -7,6 +7,7 @@ from copy import deepcopy
 import numpy as np
 import torch
 import random
+from methods.hypernets.intervalhmaml import IntervalHMAML
 from neptune.new import Run
 import torch.optim
 import torch.optim.lr_scheduler as lr_scheduler
@@ -464,7 +465,8 @@ if __name__ == '__main__':
                 model = HyperMAML(model_dict[params.model], params=params, approx=(params.method == 'maml_approx'),
                                **train_few_shot_params)
             else:
-                raise ValueError(f"Unknown method {params.method}")
+                model = IntervalHMAML(model_dict[params.model], params=params, approx=(params.method == 'maml_approx'),
+                               **train_few_shot_params)
             if params.dataset in ['omniglot', 'cross_char']:  # maml use different parameter in omniglot
                 model.n_task = 32
                 model.task_update_num = 1

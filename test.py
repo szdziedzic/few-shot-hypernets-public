@@ -16,6 +16,7 @@ from data.datamgr import SetDataManager
 from methods.baselinefinetune import BaselineFinetune
 from methods.hypernets.hypernet_poc import HyperNetPOC
 from methods.hypernets import hypernet_types
+from methods.hypernets.intervalhmaml import IntervalHMAML
 from methods.protonet import ProtoNet
 from methods.DKT import DKT
 from methods.matchingnet import MatchingNet
@@ -120,7 +121,7 @@ def single_test(params, repeat_num):
         elif params.method == 'hyper_maml':
             model = HyperMAML(model_dict[params.model], params=params, approx=(params.method == 'maml_approx'),  **few_shot_params)
         else:
-            raise ValueError('Unknown method')
+            model = IntervalHMAML(model_dict[params.model], params=params, approx=(params.method == 'maml_approx'),  **few_shot_params)
 
         if params.dataset in ['omniglot', 'cross_char']:  # maml use different parameter in omniglot
             model.n_task = 32
