@@ -185,10 +185,8 @@ class IntervalHMAML(HyperMAML):
 
             if i < self.hn_tn_depth - 1:
                 linear = Linear_fw(in_dim, out_dim)
-                linear.bias.data.fill_(0)
             else:
                 linear = IntervalLinear_fw(in_dim, out_dim)
-                linear.bias.data.fill
 
             layers.append(linear)
 
