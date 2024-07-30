@@ -64,6 +64,7 @@ def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 
 
 def single_test(params, repeat_num):
     acc_all = []
+    acc_wc_all = []
 
     bayesian_params_dict = None
 
@@ -208,7 +209,10 @@ def single_test(params, repeat_num):
         model.eval()
         model.single_test = True
 
-        if isinstance(model, (MAML, BayesHMAML, HyperMAML)):
+        acc_wc_mean = None
+        if isinstance(model, IntervalHMAML):
+            acc_mean, acc_wc_mean, acc_std, acc_wc_std, eval_time, *_ = model.test_loop(novel_loader, return_std = True, return_time=True)
+        elif isinstance(model, (MAML, BayesHMAML, HyperMAML)):
             acc_mean, acc_std, eval_time, *_ = model.test_loop( novel_loader, return_std = True, return_time=True)
         else:
             acc_mean, acc_std, _, bayesian_params_dict = model.test_loop(novel_loader, return_std = True, epoch=repeat_num)

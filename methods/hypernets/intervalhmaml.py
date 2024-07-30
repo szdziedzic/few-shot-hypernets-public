@@ -1,4 +1,6 @@
+from collections import defaultdict
 from copy import deepcopy
+from time import time
 from typing import cast
 import numpy as np
 import torch
@@ -755,3 +757,102 @@ class IntervalHMAML(HyperMAML):
         return 100 * accuracy_from_scores(
             scores_middle, n_way=self.n_way, n_query=self.n_query
         )
+
+    def correct(self, x):
+        scores_lower, scores_middle, scores_upper, total_delta_sum = self.set_forward(x)
+        y_query = np.repeat(range(self.n_way), self.n_query)
+
+        best_case_topk_scores, best_case_topk_labels = scores_middle.data.topk(
+            1, 1, True, True
+        )
+        best_case_topk_ind = best_case_topk_labels.cpu().numpy()
+        best_case_top1_correct = np.sum(best_case_topk_ind[:, 0] == y_query)
+
+        worst_case_top1_correct = None
+        if scores_lower is not None and scores_upper is not None:
+            worst_case_pred = robust_output(
+                scores_lower, scores_upper, y_query, num_classes=self.n_way
+            )
+            worst_case_topk_scores, worst_case_topk_labels = worst_case_pred.data.topk(
+                1, 1, True, True
+            )
+            worst_case_topk_ind = worst_case_topk_labels.cpu().numpy()
+            worst_case_top1_correct = np.sum(worst_case_topk_ind[:, 0] == y_query)
+        return (
+            float(best_case_top1_correct),
+            float(worst_case_top1_correct),
+            len(y_query),
+        )
+
+    def test_loop(
+        self, test_loader, return_std=False, return_time: bool = False
+    ):  # overwrite parrent function
+
+        best_case_acc_all = []
+        worst_case_acc_all = []
+        self.delta_list = []
+        acc_at = defaultdict(list)
+
+        iter_num = len(test_loader)
+
+        eval_time = 0
+
+        if self.hm_set_forward_with_adaptation:
+            for i, (x, _) in enumerate(test_loader):
+                self.n_query = x.size(1) - self.n_support
+                assert self.n_way == x.size(0), "MAML do not support way change"
+                s = time()
+                acc_task, acc_at_metrics = self.set_forward_with_adaptation(x)
+                t = time()
+                for k, v in acc_at_metrics.items():
+                    acc_at[k].append(v)
+                best_case_acc_all.append(acc_task)
+                eval_time += t - s
+
+        else:
+            for i, (x, _) in enumerate(test_loader):
+                self.n_query = x.size(1) - self.n_support
+                assert self.n_way == x.size(
+                    0
+                ), f"MAML do not support way change, {self.n_way=}, {x.size(0)=}"
+                s = time()
+                best_case_correct_this, worst_case_correct_this, count_this = (
+                    self.correct(x)
+                )
+                t = time()
+                best_case_acc_all.append(best_case_correct_this / count_this * 100)
+                worst_case_acc_all.append(worst_case_correct_this / count_this * 100)
+                eval_time += t - s
+
+        metrics = {k: np.mean(v) if len(v) > 0 else 0 for (k, v) in acc_at.items()}
+
+        num_tasks = len(best_case_acc_all)
+        best_case_acc_all = np.asarray(best_case_acc_all)
+        best_case_acc_mean = np.mean(best_case_acc_all)
+        best_case_acc_std = np.std(best_case_acc_all)
+
+        worst_case_acc_all = np.asarray(worst_case_acc_all)
+        worst_case_acc_mean = np.mean(worst_case_acc_all)
+        worst_case_acc_std = np.std(worst_case_acc_all)
+
+        print(
+            "%d Best Case Test Acc = %4.2f%% +- %4.2f%% | Worst Case Test Acc = %4.2f%% +- %4.2f%%"
+            % (
+                iter_num,
+                best_case_acc_mean,
+                1.96 * best_case_acc_std / np.sqrt(iter_num),
+                worst_case_acc_mean,
+                1.96 * worst_case_acc_std / np.sqrt(iter_num),
+            )
+        )
+        print("Num tasks", num_tasks)
+
+        ret = [best_case_acc_mean, worst_case_acc_mean]
+        if return_std:
+            ret.append(best_case_acc_std)
+            ret.append(worst_case_acc_std)
+        if return_time:
+            ret.append(eval_time)
+        ret.append(metrics)
+
+        return ret

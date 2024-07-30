@@ -114,7 +114,9 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
         raise ValueError(f'Unknown optimization {optimization}, please define by yourself')
 
     max_acc = 0
+    max_acc_wc = 0
     max_train_acc = 0
+    max_train_acc_wc = 0
     max_acc_adaptation_dict = {}
 
     if params.hm_set_forward_with_adaptation:
@@ -197,15 +199,20 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             params.es_epoch - 1,
             stop_epoch - 1
         ]:
-            if isinstance(model, HyperShot):
+            acc_wc = None
+            if isinstance(model, IntervalHMAML):
+                acc, acc_wc, test_loop_metrics = model.test_loop(val_loader)
+            elif isinstance(model, HyperShot):
                 acc, test_loop_metrics, bnn_dict = model.test_loop(val_loader)
-
             else:
                 acc, test_loop_metrics = model.test_loop(val_loader)
                 bnn_dict = dict()
 
-            print(
-                f"Epoch {epoch}/{stop_epoch}  | Max test acc {max_acc:.2f} | Test acc {acc:.2f} | Metrics: {test_loop_metrics}")
+            if acc_wc:
+                print(f"Epoch {epoch}/{stop_epoch}  | Max test acc {max_acc:.2f} | Test acc {acc:.2f} | Test acc wc {acc_wc:.2f} | Metrics: {test_loop_metrics}")
+            else:
+                print(
+                    f"Epoch {epoch}/{stop_epoch}  | Max test acc {max_acc:.2f} | Test acc {acc:.2f} | Metrics: {test_loop_metrics}")
 
             if bnn_dict and neptune_run is not None:
                 for key in bnn_dict.keys():
@@ -218,8 +225,11 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             metrics = metrics or dict()
             metrics["lr"] = scheduler.get_lr()
             metrics["accuracy/val"] = acc
+            metrics["accuracy/val_wc"] = acc_wc
             metrics["accuracy/val_max"] = max_acc
+            metrics["accuracy/val_wc_max"] = max_acc_wc
             metrics["accuracy/train_max"] = max_train_acc
+            metrics["accuracy/train_wc_max"] = max_train_acc_wc
             metrics["reparam_scaling"] = min(1,(epoch-params.hn_warmup_start_epoch) / (params.hn_warmup_stop_epoch-params.hn_warmup_start_epoch)) if epoch >= params.hn_warmup_start_epoch else 0
             metrics = {
                 **metrics,
@@ -236,6 +246,9 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
 
             if metrics["accuracy/train"] > max_train_acc:
                 max_train_acc = metrics["accuracy/train"]
+
+            if metrics["accuracy/train_wc"] > max_train_acc_wc:
+                max_train_acc_wc = metrics["accuracy/train_wc"]
 
             if params.hm_set_forward_with_adaptation:
                 for i in range(params.hn_val_epochs + 1):
@@ -260,6 +273,9 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             outfile = os.path.join(params.checkpoint_dir, 'last_model.tar')
             torch.save({'epoch': epoch, 'state': model.state_dict()}, outfile)
 
+            if acc_wc and acc_wc > max_acc_wc:
+                max_acc_wc = acc_wc
+            
             if params.maml_save_feature_network and params.method in ['maml', 'hyper_maml','bayes_hmaml', 'interval_hmaml']:
                 outfile = os.path.join(params.checkpoint_dir, 'last_feature_net.tar')
                 torch.save({'epoch': epoch, 'state': model.feature.state_dict()}, outfile)
