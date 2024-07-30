@@ -90,6 +90,7 @@ def robust_output(output_lower, output_higher, target, num_classes):
         Robust output logits (lower bound for correct class, upper bounds for incorrect classes).
     """
     y_oh = F.one_hot(target, num_classes=num_classes)
+    y_oh = y_oh.to(torch.device("cuda"))
     return torch.where(
         y_oh.bool(), output_lower.rename(None), output_higher.rename(None)
     )
