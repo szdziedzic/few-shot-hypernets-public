@@ -202,6 +202,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             acc_wc = None
             if isinstance(model, IntervalHMAML):
                 acc, acc_wc, test_loop_metrics = model.test_loop(val_loader)
+                bnn_dict = dict()
             elif isinstance(model, HyperShot):
                 acc, test_loop_metrics, bnn_dict = model.test_loop(val_loader)
             else:
