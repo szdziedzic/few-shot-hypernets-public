@@ -121,7 +121,7 @@ class IntervalLinear_fw(
                 self.bias.radius,
             )
         else:
-            out = None, super(IntervalLinear_fw, self).forward(x), None
+            out = (None, super(IntervalLinear_fw, self).forward(x), None)
         return out
 
 
