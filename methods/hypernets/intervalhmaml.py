@@ -2,13 +2,10 @@ from copy import deepcopy
 from typing import cast
 import numpy as np
 import torch
-
 from torch import nn
 from torch import Tensor
 from torch.nn import functional as F
 from torch.autograd import Variable
-
-from backbone import Linear_fw
 from methods.hypernets.hypermaml import HyperMAML
 from methods.hypernets.utils import accuracy_from_scores, get_param_dict
 
@@ -120,6 +117,11 @@ class IntervalLinear_fw(
                 self.bias.fast,
                 self.bias.radius,
             )
+            out = out.refine_names("N", "bounds", ...)
+            out_lower, out_middle, out_upper = map(
+                lambda out_: cast(Tensor, out_.rename(None)), out.unbind("bounds")
+            )
+            return out_lower, out_middle, out_upper
         else:
             out = (None, super(IntervalLinear_fw, self).forward(x), None)
         return out
@@ -302,7 +304,7 @@ class IntervalHMAML(HyperMAML):
                 fast_parameters = fast_parameters + clf_fast_parameters
 
                 for task_step in range(self.task_update_num):
-                    scores_lower, scores_middle, scores_upper = self.classifier(
+                    scores_lower, scores_middle, scores_upper = self.classifier.forward(
                         support_embeddings
                     )
 
