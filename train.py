@@ -248,8 +248,8 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             if metrics["accuracy/train"] > max_train_acc:
                 max_train_acc = metrics["accuracy/train"]
 
-            if metrics["accuracy/train_wc"] > max_train_acc_wc:
-                max_train_acc_wc = metrics["accuracy/train_wc"]
+            if hasattr(metrics, "accuracy_worst_case/train") and metrics["accuracy_worst_case/train"] > max_train_acc_wc:
+                max_train_acc_wc = metrics["accuracy_worst_case/train"]
 
             if params.hm_set_forward_with_adaptation:
                 for i in range(params.hn_val_epochs + 1):
