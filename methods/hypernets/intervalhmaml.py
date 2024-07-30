@@ -172,25 +172,7 @@ class IntervalHMAML(HyperMAML):
         self.worst_case_loss_multiplier = params.hm_worst_case_loss_multiplier
 
     def _init_classifier(self):
-        assert (
-            self.hn_tn_hidden_size % self.n_way == 0
-        ), f"hn_tn_hidden_size {self.hn_tn_hidden_size} should be the multiple of n_way {self.n_way}"
-        layers = []
-
-        for i in range(self.hn_tn_depth):
-            in_dim = self.feat_dim if i == 0 else self.hn_tn_hidden_size
-            out_dim = (
-                self.n_way if i == (self.hn_tn_depth - 1) else self.hn_tn_hidden_size
-            )
-
-            if i < self.hn_tn_depth - 1:
-                linear = Linear_fw(in_dim, out_dim)
-            else:
-                linear = IntervalLinear_fw(in_dim, out_dim)
-
-            layers.append(linear)
-
-        self.classifier = nn.Sequential(*layers)
+        self.classifier = IntervalLinear_fw(self.feat_dim, self.n_way)
 
     def _init_hypernet_modules(self, params):
         target_net_param_dict = get_param_dict(self.classifier)
