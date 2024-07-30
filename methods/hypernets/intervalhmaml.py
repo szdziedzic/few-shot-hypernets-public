@@ -25,8 +25,8 @@ def interval_forward(
     x: Tensor,
     weight: Tensor,
     radius: Tensor,
-    bias: Tensor | None = None,
-    bias_radius: Tensor | None = None,
+    bias: Tensor,
+    bias_radius: Tensor,
 ) -> Tensor:
     x = x.rename(None)
     tiler = [1] * (len(x.shape) + 1)
