@@ -477,8 +477,8 @@ class IntervalHMAML(HyperMAML):
 
     def set_forward_loss(self, x):
         if (
-            self.current_epoch_nr % self.eps_pump_epochs == 0
-            and self.current_epoch_nr > self.radius_eps_warmup_epochs
+            self.epoch % self.eps_pump_epochs == 0
+            and self.epoch > self.radius_eps_warmup_epochs
         ):
             self.eps = self.eps + self.eps_pump_value
 
