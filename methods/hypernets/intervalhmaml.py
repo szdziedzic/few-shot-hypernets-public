@@ -121,7 +121,7 @@ class IntervalLinear_fw(
                 self.bias.radius,
             )
         else:
-            out = super(IntervalLinear_fw, self).forward(x)
+            out = None, super(IntervalLinear_fw, self).forward(x), None
         return out
 
 
@@ -380,12 +380,9 @@ class IntervalHMAML(HyperMAML):
 
         if self.enhance_embeddings:
             with torch.no_grad():
-                logits = (
-                    self.classifier.forward(support_embeddings)
-                    .detach()[:, 1]
-                    .squeeze()
-                    .rename(None)
-                )
+                logits_upper, logits, logits_lower = self.classifier.forward(
+                    support_embeddings
+                ).detach()
                 logits = F.softmax(logits, dim=1)
 
             labels = support_data_labels.view(support_embeddings.shape[0], -1)
