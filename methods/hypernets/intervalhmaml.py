@@ -771,7 +771,10 @@ class IntervalHMAML(HyperMAML):
         worst_case_top1_correct = None
         if scores_lower is not None and scores_upper is not None:
             worst_case_pred = robust_output(
-                scores_lower, scores_upper, y_query, num_classes=self.n_way
+                scores_lower,
+                scores_upper,
+                torch.from_numpy(y_query).long(),
+                num_classes=self.n_way,
             )
             worst_case_topk_scores, worst_case_topk_labels = worst_case_pred.data.topk(
                 1, 1, True, True
