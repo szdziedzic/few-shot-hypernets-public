@@ -382,7 +382,8 @@ class IntervalHMAML(HyperMAML):
             with torch.no_grad():
                 logits_upper, logits, logits_lower = self.classifier.forward(
                     support_embeddings
-                ).detach()
+                )
+                logits = logits.detach()
                 logits = F.softmax(logits, dim=1)
 
             labels = support_data_labels.view(support_embeddings.shape[0], -1)
