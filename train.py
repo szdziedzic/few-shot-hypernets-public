@@ -252,14 +252,14 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
                 outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
                 torch.save({'epoch': epoch, 'state': model.state_dict()}, outfile)
 
-                if params.maml_save_feature_network and params.method in ['maml', 'hyper_maml','bayes_hmaml']:
+                if params.maml_save_feature_network and params.method in ['maml', 'hyper_maml','bayes_hmaml', 'interval_hmaml']:
                     outfile = os.path.join(params.checkpoint_dir, 'best_feature_net.tar')
                     torch.save({'epoch': epoch, 'state': model.feature.state_dict()}, outfile)
 
             outfile = os.path.join(params.checkpoint_dir, 'last_model.tar')
             torch.save({'epoch': epoch, 'state': model.state_dict()}, outfile)
 
-            if params.maml_save_feature_network and params.method in ['maml', 'hyper_maml','bayes_hmaml']:
+            if params.maml_save_feature_network and params.method in ['maml', 'hyper_maml','bayes_hmaml', 'interval_hmaml']:
                 outfile = os.path.join(params.checkpoint_dir, 'last_feature_net.tar')
                 torch.save({'epoch': epoch, 'state': model.feature.state_dict()}, outfile)
 
@@ -403,7 +403,7 @@ if __name__ == '__main__':
             model = BaselineTrain(model_dict[params.model], params.num_classes, loss_type='dist')
 
     elif params.method in ['DKT', 'protonet', 'matchingnet', 'relationnet', 'relationnet_softmax', 'maml',
-                           'maml_approx', 'hyper_maml','bayes_hmaml'] + list(hypernet_types.keys()):
+                           'maml_approx', 'hyper_maml','bayes_hmaml', 'interval_hmaml'] + list(hypernet_types.keys()):
         n_query = max(1, int(
             16 * params.test_n_way / params.train_n_way))  # if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
         print("n_query", n_query)
@@ -452,7 +452,7 @@ if __name__ == '__main__':
         elif params.method in hypernet_types.keys():
             hn_type: Type[HyperNetPOC] = hypernet_types[params.method]
             model = hn_type(model_dict[params.model], params=params, **train_few_shot_params)
-        elif params.method == "hyper_maml" or params.method == 'bayes_hmaml':
+        elif params.method in ["hyper_maml", 'bayes_hmaml', 'interval_hmaml']:
             backbone.ConvBlock.maml = True
             backbone.SimpleBlock.maml = True
             backbone.BottleneckBlock.maml = True
@@ -460,9 +460,11 @@ if __name__ == '__main__':
             if params.method == 'bayes_hmaml':
                 model = BayesHMAML(model_dict[params.model], params=params, approx=(params.method == 'maml_approx'),
                                **train_few_shot_params)
-            else:
+            elif params.method == 'hyper_maml':
                 model = HyperMAML(model_dict[params.model], params=params, approx=(params.method == 'maml_approx'),
                                **train_few_shot_params)
+            else:
+                raise ValueError(f"Unknown method {params.method}")
             if params.dataset in ['omniglot', 'cross_char']:  # maml use different parameter in omniglot
                 model.n_task = 32
                 model.task_update_num = 1
@@ -485,7 +487,7 @@ if __name__ == '__main__':
     print(params.checkpoint_dir)
     start_epoch = params.start_epoch
     stop_epoch = params.stop_epoch
-    if params.method in ['maml', 'maml_approx', 'hyper_maml','bayes_hmaml']:
+    if params.method in ['maml', 'maml_approx', 'hyper_maml','bayes_hmaml', 'interval_hmaml']:
         stop_epoch = params.stop_epoch * model.n_task  # maml use multiple tasks in one update
 
     if params.resume:
