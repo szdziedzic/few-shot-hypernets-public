@@ -668,7 +668,7 @@ class IntervalHMAML(HyperMAML):
         metrics["loss_worst_case"] = worst_case_acc_mean
 
         metrics["curr_eps"] = self.eps
-        metrics["curr_radius"] = self.classifier[-1].radius
+        metrics["curr_radius"] = self.classifier.weight.radius
 
         if self.hn_adaptation_strategy == "increasing_alpha":
             metrics["alpha"] = self.alpha
