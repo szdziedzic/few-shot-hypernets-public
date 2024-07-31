@@ -461,12 +461,6 @@ class IntervalHMAML(HyperMAML):
                 return scores_lower, scores_middle, scores_upper, None
 
     def set_forward_loss(self, x):
-        if (
-            self.epoch % self.eps_pump_epochs == 0
-            and self.epoch > self.radius_eps_warmup_epochs
-        ):
-            self.eps = self.eps + self.eps_pump_value
-
         """Adapt and forward using x. Return scores and total losses"""
         scores_lower, scores_middle, scores_upper, total_delta_sum = self.set_forward(
             x, is_feature=False, train_stage=True
@@ -597,6 +591,12 @@ class IntervalHMAML(HyperMAML):
         optimizer.zero_grad()
 
         self.delta_list = []
+
+        if (
+            self.epoch % self.eps_pump_epochs == 0
+            and self.epoch > self.radius_eps_warmup_epochs
+        ):
+            self.eps = self.eps + self.eps_pump_value
 
         # train
         for i, (x, _) in enumerate(train_loader):
