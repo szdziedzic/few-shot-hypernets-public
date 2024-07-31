@@ -613,9 +613,9 @@ class IntervalHMAML(HyperMAML):
             avg_loss = avg_loss + loss.item()  # .data[0]
             avg_best_case_loss = avg_best_case_loss + loss_best_case.item()
             avg_worst_case_loss = avg_worst_case_loss + loss_worst_case.item()
-            loss_all.append(loss.item())
-            best_case_loss_all.append(loss_best_case.item())
-            worst_case_loss_all.append(loss_worst_case.item())
+            loss_all.append(loss)
+            best_case_loss_all.append(loss_best_case)
+            worst_case_loss_all.append(loss_worst_case)
             best_case_acc_all.append(best_case_task_accuracy)
             worst_case_acc_all.append(worst_case_task_accuracy)
 
