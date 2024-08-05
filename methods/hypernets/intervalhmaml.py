@@ -710,7 +710,7 @@ class IntervalHMAML(HyperMAML):
         ):
             if hasattr(param1, "fast"):
                 if param1.fast is not None:
-                    param2.fast = list(param1.fast)
+                    param2.fast = param1.fast.clone()
                 else:
                     param2.fast = None
             if hasattr(param1, "radius"):
