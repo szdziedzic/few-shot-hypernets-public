@@ -170,9 +170,9 @@ class IntervalHMAML(HyperMAML):
             model_func, n_way, n_support, n_query, approx=approx, params=params
         )
         # num of weight set draws for softvoting
-        self.eps = params.hm_eps
+        self.eps = torch.tensor(params.hm_eps)
         self.eps_pump_epochs = params.hm_eps_pump_epochs
-        self.eps_pump_value = params.hm_eps_pump_value
+        self.eps_pump_value = torch.tensor(params.hm_eps_pump_value)
         self.radius_eps_warmup_epochs = params.hm_radius_eps_warmup_epochs
         self.worst_case_loss_multiplier = params.hm_worst_case_loss_multiplier
 
