@@ -170,9 +170,9 @@ class IntervalHMAML(HyperMAML):
             model_func, n_way, n_support, n_query, approx=approx, params=params
         )
         # num of weight set draws for softvoting
-        self.eps = torch.tensor(params.hm_eps).cpu()
+        self.eps = torch.tensor(params.hm_eps)
         self.eps_pump_epochs = params.hm_eps_pump_epochs
-        self.eps_pump_value = torch.tensor(params.hm_eps_pump_value).cpu()
+        self.eps_pump_value = torch.tensor(params.hm_eps_pump_value)
         self.radius_eps_warmup_epochs = params.hm_radius_eps_warmup_epochs
         self.worst_case_loss_multiplier = params.hm_worst_case_loss_multiplier
 
@@ -614,8 +614,8 @@ class IntervalHMAML(HyperMAML):
             avg_best_case_loss = avg_best_case_loss + loss_best_case.item()
             avg_worst_case_loss = avg_worst_case_loss + loss_worst_case.item()
             loss_all.append(loss)
-            best_case_loss_all.append(loss_best_case)
-            worst_case_loss_all.append(loss_worst_case)
+            best_case_loss_all.append(loss_best_case.cpu().detach())
+            worst_case_loss_all.append(loss_worst_case.cpu().detach())
             best_case_acc_all.append(best_case_task_accuracy)
             worst_case_acc_all.append(worst_case_task_accuracy)
 
