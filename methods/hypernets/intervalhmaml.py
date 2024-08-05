@@ -627,9 +627,6 @@ class IntervalHMAML(HyperMAML):
 
                 optimizer.step()
                 task_count = 0
-                loss_all = []
-                best_case_loss_all = []
-                worst_case_loss_all = []
 
             optimizer.zero_grad()
             if i % print_freq == 0:
