@@ -651,17 +651,17 @@ class IntervalHMAML(HyperMAML):
         metrics = {"accuracy/train": best_case_acc_mean}
 
         worst_case_acc_all = np.asarray(worst_case_acc_all)
-        worst_case_acc_mean = np.mean(worst_case_acc_all)
+        worst_case_acc_mean = np.mean(worst_case_acc_all).astype(float)
 
         metrics["accuracy_worst_case/train"] = worst_case_acc_mean
 
         best_case_loss_all = np.asarray(best_case_loss_all)
-        best_case_loss_mean = np.mean(best_case_loss_all)
+        best_case_loss_mean = np.mean(best_case_loss_all).astype(float)
 
         metrics["loss_best_case"] = best_case_loss_mean
 
         worst_case_loss_all = np.asarray(worst_case_loss_all)
-        worst_case_loss_mean = np.mean(worst_case_loss_all)
+        worst_case_loss_mean = np.mean(worst_case_loss_all).astype(float)
 
         metrics["loss_worst_case"] = worst_case_loss_mean
 
