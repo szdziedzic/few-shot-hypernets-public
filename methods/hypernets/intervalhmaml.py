@@ -13,11 +13,7 @@ from methods.hypernets.utils import accuracy_from_scores, get_param_dict
 
 
 def radius_transform(radius: Tensor) -> Tensor:
-    product = 1
-    for dim in list(radius.size()):
-        product = dim
-
-    return radius / product
+    return radius
 
 
 def interval_forward(
@@ -125,6 +121,8 @@ class IntervalLinear_fw(
                 lambda out_: cast(Tensor, out_.rename(None)), out.unbind("bounds")
             )
             return out_lower, out_middle, out_upper
+        elif self.weight.fast is not None and self.bias.fast is not None:
+            out = (None, F.linear(x, self.weight.fast, self.bias.fast), None)
         else:
             out = (None, super(IntervalLinear_fw, self).forward(x), None)
         return out
@@ -281,8 +279,9 @@ class IntervalHMAML(HyperMAML):
         if radius is None:  # used in maml warmup
             weight.fast = weight - update_weight
         else:
-            weight.radius = torch.abs(radius) + self.eps
             weight.fast = weight - update_weight
+            if self.epoch > self.radius_eps_warmup_epochs:
+                weight.radius = torch.abs(radius) + self.eps
 
     def _update_network_weights(
         self,
@@ -476,7 +475,7 @@ class IntervalHMAML(HyperMAML):
             query_data_labels = torch.cat((support_data_labels, query_data_labels))
 
         worst_case_pred = None
-        loss_worst_case = 0
+        loss_worst_case = torch.tensor(0.0).cuda()
         loss_best_case = self.loss_fn(scores_middle, query_data_labels)
         if scores_lower is not None and scores_upper is not None:
             worst_case_pred = robust_output(
@@ -532,7 +531,7 @@ class IntervalHMAML(HyperMAML):
             torch.from_numpy(np.repeat(range(self.n_way), self.n_support))
         ).cuda()
 
-        loss_worst_case = 0
+        loss_worst_case = torch.tensor(0.0).cuda()
         if scores_lower is not None and scores_upper is not None:
             loss_worst_case = self.loss_fn(
                 robust_output(
@@ -614,10 +613,11 @@ class IntervalHMAML(HyperMAML):
             avg_best_case_loss = avg_best_case_loss + loss_best_case.item()
             avg_worst_case_loss = avg_worst_case_loss + loss_worst_case.item()
             loss_all.append(loss)
-            best_case_loss_all.append(loss_best_case)
-            worst_case_loss_all.append(loss_worst_case)
+            best_case_loss_all.append(loss_best_case.cpu().detach().numpy())
+            worst_case_loss_all.append(loss_worst_case.cpu().detach().numpy())
             best_case_acc_all.append(best_case_task_accuracy)
-            worst_case_acc_all.append(worst_case_task_accuracy)
+            if worst_case_task_accuracy is not None:
+                worst_case_acc_all.append(worst_case_task_accuracy)
 
             task_count += 1
 
@@ -628,8 +628,6 @@ class IntervalHMAML(HyperMAML):
                 optimizer.step()
                 task_count = 0
                 loss_all = []
-                best_case_loss_all = []
-                worst_case_loss_all = []
 
             optimizer.zero_grad()
             if i % print_freq == 0:
@@ -642,33 +640,40 @@ class IntervalHMAML(HyperMAML):
                         avg_loss / float(i + 1),
                         avg_best_case_loss / float(i + 1),
                         avg_worst_case_loss / float(i + 1),
-                        best_case_task_accuracy,
-                        worst_case_task_accuracy,
+                        (
+                            best_case_task_accuracy
+                            if best_case_task_accuracy is not None
+                            else 0
+                        ),
+                        (
+                            worst_case_task_accuracy
+                            if worst_case_task_accuracy is not None
+                            else 0
+                        ),
                     )
                 )
 
         best_case_acc_all = np.asarray(best_case_acc_all)
-        best_case_acc_mean = np.mean(best_case_acc_all)
+        best_case_acc_mean = np.mean(best_case_acc_all).astype(float)
 
         metrics = {"accuracy/train": best_case_acc_mean}
 
         worst_case_acc_all = np.asarray(worst_case_acc_all)
-        worst_case_acc_mean = np.mean(worst_case_acc_all)
-
+        worst_case_acc_mean = np.mean(worst_case_acc_all).astype(float)
         metrics["accuracy_worst_case/train"] = worst_case_acc_mean
 
         loss_all = np.asarray(loss_all)
-        loss_all_mean = np.mean(loss_all)
+        loss_all_mean = np.mean(loss_all).astype(float)
 
         metrics["loss"] = loss_all_mean
 
         best_case_loss_all = np.asarray(best_case_loss_all)
-        best_case_loss_mean = np.mean(best_case_loss_all)
+        best_case_loss_mean = np.mean(best_case_loss_all).astype(float)
 
         metrics["loss_best_case"] = best_case_loss_mean
 
         worst_case_loss_all = np.asarray(worst_case_loss_all)
-        worst_case_loss_mean = np.mean(worst_case_loss_all)
+        worst_case_loss_mean = np.mean(worst_case_loss_all).astype(float)
 
         metrics["loss_worst_case"] = worst_case_loss_mean
 
@@ -786,7 +791,11 @@ class IntervalHMAML(HyperMAML):
             worst_case_top1_correct = np.sum(worst_case_topk_ind[:, 0] == y_query)
         return (
             float(best_case_top1_correct),
-            float(worst_case_top1_correct),
+            (
+                float(worst_case_top1_correct)
+                if worst_case_top1_correct is not None
+                else None
+            ),
             len(y_query),
         )
 
@@ -827,7 +836,10 @@ class IntervalHMAML(HyperMAML):
                 )
                 t = time()
                 best_case_acc_all.append(best_case_correct_this / count_this * 100)
-                worst_case_acc_all.append(worst_case_correct_this / count_this * 100)
+                if worst_case_correct_this is not None:
+                    worst_case_acc_all.append(
+                        worst_case_correct_this / count_this * 100
+                    )
                 eval_time += t - s
 
         metrics = {k: np.mean(v) if len(v) > 0 else 0 for (k, v) in acc_at.items()}
