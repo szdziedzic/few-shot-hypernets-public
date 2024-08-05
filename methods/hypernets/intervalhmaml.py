@@ -627,6 +627,7 @@ class IntervalHMAML(HyperMAML):
 
                 optimizer.step()
                 task_count = 0
+                loss_all = []
 
             optimizer.zero_grad()
             if i % print_freq == 0:
@@ -653,11 +654,6 @@ class IntervalHMAML(HyperMAML):
         worst_case_acc_mean = np.mean(worst_case_acc_all)
 
         metrics["accuracy_worst_case/train"] = worst_case_acc_mean
-
-        loss_all = np.asarray(loss_all)
-        loss_all_mean = np.mean(loss_all)
-
-        metrics["loss"] = loss_all_mean
 
         best_case_loss_all = np.asarray(best_case_loss_all)
         best_case_loss_mean = np.mean(best_case_loss_all)
