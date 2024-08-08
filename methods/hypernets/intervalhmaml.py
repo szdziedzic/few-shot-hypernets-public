@@ -483,12 +483,12 @@ class IntervalHMAML(HyperMAML):
                 scores_lower, scores_upper, query_data_labels, num_classes=self.n_way
             )
             loss_worst_case = self.loss_fn(worst_case_pred, query_data_labels)
-            loss = loss_worst_case
         else:
             loss_best_case = self.loss_fn(scores_middle, query_data_labels)
-            loss = loss_best_case
 
         torch.zeros_like(loss_best_case)
+
+        loss = self.worst_case_loss_multiplier * loss_worst_case + loss_best_case
 
         if self.hm_lambda != 0:
             loss = loss + self.hm_lambda * total_delta_sum
