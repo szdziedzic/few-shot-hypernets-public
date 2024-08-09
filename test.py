@@ -16,6 +16,7 @@ from data.datamgr import SetDataManager
 from methods.baselinefinetune import BaselineFinetune
 from methods.hypernets.hypernet_poc import HyperNetPOC
 from methods.hypernets import hypernet_types
+from methods.hypernets.intervalhmaml import IntervalHMAML
 from methods.protonet import ProtoNet
 from methods.DKT import DKT
 from methods.matchingnet import MatchingNet
@@ -63,6 +64,7 @@ def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 
 
 def single_test(params, repeat_num):
     acc_all = []
+    acc_wc_all = []
 
     bayesian_params_dict = None
 
@@ -114,12 +116,14 @@ def single_test(params, repeat_num):
         hn_type: Type[HyperNetPOC] = hypernet_types[params.method]
         model = hn_type(model_dict[params.model], params=params, **few_shot_params)
         # model = HyperNetPOC(model_dict[params.model], **few_shot_params)
-    elif params.method == 'hyper_maml' or params.method == 'bayes_hmaml':
+    elif params.method in ['hyper_maml', 'bayes_hmaml', 'interval_hmaml']:
         if params.method == 'bayes_hmaml':
             model = BayesHMAML(model_dict[params.model], params=params, approx=(params.method == 'maml_approx'), **few_shot_params)
+        elif params.method == 'hyper_maml':
+            model = HyperMAML(model_dict[params.model], params=params, approx=(params.method == 'maml_approx'),  **few_shot_params)
         else:
-            model = HyperMAML(model_dict[params.model], params=params, approx=(params.method == 'maml_approx'),
-                               **few_shot_params)
+            model = IntervalHMAML(model_dict[params.model], params=params, approx=(params.method == 'maml_approx'),  **few_shot_params)
+
         if params.dataset in ['omniglot', 'cross_char']:  # maml use different parameter in omniglot
             model.n_task = 32
             model.train_lr = 0.1
@@ -173,7 +177,7 @@ def single_test(params, repeat_num):
         split_str = split
 
     eval_time = 0
-    if params.method in ['maml', 'maml_approx', 'hyper_maml','bayes_hmaml', 'DKT'] + list(hypernet_types.keys()): #maml do not support testing with feature
+    if params.method in ['maml', 'maml_approx', 'hyper_maml','bayes_hmaml', 'DKT', 'interval_hmaml'] + list(hypernet_types.keys()): #maml do not support testing with feature
         if 'Conv' in params.model:
             if params.dataset in ['omniglot', 'cross_char']:
                 image_size = 28
@@ -205,7 +209,10 @@ def single_test(params, repeat_num):
         model.eval()
         model.single_test = True
 
-        if isinstance(model, (MAML, BayesHMAML, HyperMAML)):
+        acc_wc_mean = None
+        if isinstance(model, IntervalHMAML):
+            acc_mean, acc_wc_mean, acc_std, acc_wc_std, eval_time, *_ = model.test_loop(novel_loader, return_std = True, return_time=True)
+        elif isinstance(model, (MAML, BayesHMAML, HyperMAML)):
             acc_mean, acc_std, eval_time, *_ = model.test_loop( novel_loader, return_std = True, return_time=True)
         else:
             acc_mean, acc_std, _, bayesian_params_dict = model.test_loop(novel_loader, return_std = True, epoch=repeat_num)
