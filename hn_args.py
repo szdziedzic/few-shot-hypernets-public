@@ -114,4 +114,34 @@ def add_hn_args_to_parser(parser: ArgumentParser) -> ArgumentParser:
     bhypermaml_args.add_argument('--kl_stop_val', default=1e-3, type=float, help='final value of kld_scale (default 1e-3)')
     bhypermaml_args.add_argument('--kl_scale', default=1e-24, type=float, help='initial value of kld_scale (default 1e-24)')
 
+    # Interval hyper maml
+    interval_args = parser.add_argument_group("Interval HyperMAML-related arguments")
+    interval_args.add_argument(
+        "--hm_eps", type=float, default=0, help="Epsilon for interval hypermaml"
+    )
+    interval_args.add_argument(
+        "--hm_eps_pump_epochs",
+        type=int,
+        default=10,
+        help="Number of epochs between pumping epsilon",
+    )
+    interval_args.add_argument(
+        "--hm_eps_pump_value",
+        type=float,
+        default=0.1,
+        help="Value by which epsilon is pumped",
+    )
+    interval_args.add_argument(
+        "--hm_radius_eps_warmup_epochs",
+        type=float,
+        default=100,
+        help="Number of epochs for warmup without eps pumping",
+    )
+    interval_args.add_argument(
+        "--hm_worst_case_loss_multiplier",
+        type=int,
+        default=5,
+        help="Multiplier for worst case loss",
+    )
+
     return parser
